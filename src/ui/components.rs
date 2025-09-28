@@ -1,6 +1,6 @@
 use crate::domain::{
     model::AssetKind,
-    state::{AssetView, InheritedState},
+    state::AssetView,
 };
 use crate::io::sync::LocalStatus;
 
@@ -23,20 +23,6 @@ pub fn state_badge(asset: &AssetView) -> String {
         } else {
             "• Off".to_string()
         }
-    }
-}
-
-pub fn source_label(asset: &AssetView) -> String {
-    if let Some(explicit) = asset.explicit {
-        if explicit {
-            "explicit:on".to_string()
-        } else {
-            "explicit:off".to_string()
-        }
-    } else if let Some(InheritedState { collection, value }) = &asset.inherited {
-        format!("{}:{}", collection.id, if *value { "on" } else { "off" })
-    } else {
-        "default".to_string()
     }
 }
 

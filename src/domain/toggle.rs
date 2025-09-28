@@ -24,7 +24,7 @@ pub fn toggle_asset(state: &mut DomainState, kind: AssetKind, path: &str) -> Res
     };
 
     let desired = !current_effective;
-    let baseline = inherited_value.unwrap_or(true);
+    let baseline = inherited_value.unwrap_or(false);
 
     let new_explicit = if desired == baseline {
         None
@@ -236,7 +236,10 @@ mod tests {
     fn analyze_collection_toggle_impact_disable() {
         let catalog = multi_catalog();
         let collection_path = catalog.collections[0].path.clone();
-        let state = DomainState::new(catalog, EnablementFile::default());
+        let mut enablement = EnablementFile::default();
+        // Start with collection enabled
+        enablement.collections.insert(collection_path.clone(), true);
+        let state = DomainState::new(catalog, enablement);
 
         let impact = analyze_collection_toggle_impact(&state, &collection_path)
             .expect("analyze impact succeeds");
@@ -263,7 +266,8 @@ mod tests {
         let instruction_path = catalog.instructions[0].path.clone();
         let mut enablement = EnablementFile::default();
         
-        // Collection is enabled by default, but explicitly disable the instruction
+        // Start with collection enabled, but explicitly disable the instruction
+        enablement.collections.insert(collection_path.clone(), true);
         enablement.instructions.insert(instruction_path, false);
         let state = DomainState::new(catalog, enablement);
 
