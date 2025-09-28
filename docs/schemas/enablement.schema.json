@@ -1,0 +1,52 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "$id": "https://github.com/github/awesome-copilot/docs/schemas/enablement.schema.json",
+    "title": "Awesome Copilot Enablement State",
+    "type": "object",
+    "required": [
+        "version",
+        "prompts",
+        "instructions",
+        "chatModes",
+        "collections"
+    ],
+    "properties": {
+        "version": {
+            "type": "integer",
+            "minimum": 1
+        },
+        "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+        },
+        "prompts": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "boolean"
+            }
+        },
+        "instructions": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "boolean"
+            }
+        },
+        "chatModes": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "boolean"
+            }
+        },
+        "collections": {
+            "type": "object",
+            "additionalProperties": {
+                "type": "boolean"
+            }
+        },
+        "overrides": {
+            "type": "object",
+            "additionalProperties": true
+        }
+    },
+    "additionalProperties": false
+}
