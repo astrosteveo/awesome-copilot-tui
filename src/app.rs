@@ -44,6 +44,7 @@ struct Cli {
 pub(crate) enum PendingPrompt {
     Quit,
     Reload,
+    ToggleCollection,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -79,6 +80,7 @@ pub struct App {
     selections: BTreeMap<AssetKind, usize>,
     search: SearchState,
     prompt: Option<PendingPrompt>,
+    pending_toggle_asset: Option<crate::domain::state::AssetView>, // Store asset for collection toggle confirmation
     tick_rate: Duration,
     last_tick: Instant,
     should_quit: bool,
@@ -142,6 +144,7 @@ impl App {
             selections,
             search: SearchState::default(),
             prompt: None,
+            pending_toggle_asset: None,
             tick_rate,
             last_tick: Instant::now(),
             should_quit: false,
@@ -350,6 +353,7 @@ impl App {
         match key.code {
             KeyCode::Esc | KeyCode::Char('n') => {
                 self.prompt = None;
+                self.pending_toggle_asset = None;
                 self.message = Some("Cancelled".to_string());
             }
             KeyCode::Char('y') | KeyCode::Enter => {
@@ -360,6 +364,11 @@ impl App {
                     }
                     PendingPrompt::Reload => {
                         self.reload()?;
+                    }
+                    PendingPrompt::ToggleCollection => {
+                        if let Some(asset) = self.pending_toggle_asset.take() {
+                            self.perform_toggle(asset)?;
+                        }
                     }
                 }
             }
@@ -436,19 +445,53 @@ impl App {
 
     fn toggle_selection(&mut self) -> Result<()> {
         if let Some(asset) = self.selected_asset().cloned() {
-            let result =
-                crate::domain::toggle::toggle_asset(&mut self.domain, asset.kind, &asset.path)?;
-            // After state toggle, apply/remove local files accordingly.
-            self.apply_after_toggle(asset.kind, &asset.path, &result)?;
-            self.dirty = true;
-            self.message = Some(format!(
+            if asset.kind == AssetKind::Collection {
+                // Show confirmation prompt for collections
+                self.pending_toggle_asset = Some(asset.clone());
+                self.prompt = Some(PendingPrompt::ToggleCollection);
+                
+                let action = if asset.effective { "disable" } else { "enable" };
+                self.message = Some(format!(
+                    "{} collection '{}' and affect {} members? y=Yes / n=No",
+                    action.chars().next().unwrap().to_uppercase().collect::<String>() + &action[1..],
+                    asset.name,
+                    asset.member_count
+                ));
+                return Ok(());
+            }
+            
+            // For non-collections, toggle immediately
+            self.perform_toggle(asset)?;
+        }
+        Ok(())
+    }
+
+    fn perform_toggle(&mut self, asset: crate::domain::state::AssetView) -> Result<()> {
+        let result =
+            crate::domain::toggle::toggle_asset(&mut self.domain, asset.kind, &asset.path)?;
+        
+        // After state toggle, apply/remove local files accordingly.
+        self.apply_after_toggle(asset.kind, &asset.path, &result)?;
+        self.dirty = true;
+        
+        // Enhanced success message
+        let success_msg = if asset.kind == AssetKind::Collection {
+            // For collections, count affected members
+            let collection = self.domain.catalog.collections.iter()
+                .find(|c| c.path == asset.path);
+            let member_count = collection.map(|c| c.items.len()).unwrap_or(0);
+            format!(
+                "Collection '{}' → {} (affected {} member{})",
+                asset.name,
+                if result.asset.effective { "enabled" } else { "disabled" },
+                member_count,
+                if member_count == 1 { "" } else { "s" }
+            )
+        } else {
+            format!(
                 "{} → {} ({} state)",
-                asset.path,
-                if result.asset.effective {
-                    "enabled"
-                } else {
-                    "disabled"
-                },
+                asset.name,
+                if result.asset.effective { "enabled" } else { "disabled" },
                 if result.asset.explicit.is_some() {
                     "explicit"
                 } else if result.asset.inherited.is_some() {
@@ -456,10 +499,12 @@ impl App {
                 } else {
                     "default"
                 }
-            ));
-            self.error = None;
-            self.normalize_selection_after_filter();
-        }
+            )
+        };
+        
+        self.message = Some(success_msg);
+        self.error = None;
+        self.normalize_selection_after_filter();
         Ok(())
     }
 
@@ -702,6 +747,10 @@ impl App {
 
     pub fn error(&self) -> Option<&str> {
         self.error.as_deref()
+    }
+
+    pub fn domain(&self) -> &DomainState {
+        &self.domain
     }
 
     pub fn info_message(&self) -> Option<&str> {
