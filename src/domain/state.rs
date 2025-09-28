@@ -117,7 +117,7 @@ impl DomainState {
         let explicit = self.explicit_state(AssetKind::Prompt, &prompt.path);
         let inherited = self.inherited_state(&prompt.path);
         let effective =
-            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(true));
+            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(false));
         AssetView {
             kind: AssetKind::Prompt,
             path: prompt.path.clone(),
@@ -145,7 +145,7 @@ impl DomainState {
         let explicit = self.explicit_state(AssetKind::Instruction, &instruction.path);
         let inherited = self.inherited_state(&instruction.path);
         let effective =
-            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(true));
+            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(false));
         AssetView {
             kind: AssetKind::Instruction,
             path: instruction.path.clone(),
@@ -169,7 +169,7 @@ impl DomainState {
         let explicit = self.explicit_state(AssetKind::ChatMode, &mode.path);
         let inherited = self.inherited_state(&mode.path);
         let effective =
-            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(true));
+            explicit.unwrap_or_else(|| inherited.as_ref().map(|s| s.value).unwrap_or(false));
         AssetView {
             kind: AssetKind::ChatMode,
             path: mode.path.clone(),
@@ -191,7 +191,7 @@ impl DomainState {
 
     fn build_collection_view(&self, collection: &Collection) -> AssetView {
         let explicit = self.explicit_state(AssetKind::Collection, &collection.path);
-        let effective = explicit.unwrap_or(true);
+        let effective = explicit.unwrap_or(false);
         AssetView {
             kind: AssetKind::Collection,
             path: collection.path.clone(),
@@ -415,9 +415,12 @@ mod tests {
     fn toggle_collection_off_disables_members() {
         let catalog = multi_catalog();
         let collection_path = catalog.collections[0].path.clone();
-        let mut state = DomainState::new(catalog, EnablementFile::default());
+        let mut enablement = EnablementFile::default();
+        // Start with collection enabled
+        enablement.collections.insert(collection_path.clone(), true);
+        let mut state = DomainState::new(catalog, enablement);
 
-        // Toggle the collection off (default effective is true, so toggling sets it to false)
+        // Toggle the collection off (from enabled to disabled)
         let _ = toggle::toggle_asset(&mut state, AssetKind::Collection, &collection_path)
             .expect("toggle collection off succeeds");
 
@@ -425,12 +428,12 @@ mod tests {
         let inst = state.assets(AssetKind::Instruction).first().unwrap();
         assert!(!inst.effective);
         assert!(inst.explicit.is_none());
-        assert_eq!(inst.inherited.as_ref().unwrap().value, false);
+        assert!(inst.inherited.is_none()); // No inherited state since collection was removed from enablement
 
         let prm = state.assets(AssetKind::Prompt).first().unwrap();
         assert!(!prm.effective);
         assert!(prm.explicit.is_none());
-        assert_eq!(prm.inherited.as_ref().unwrap().value, false);
+        assert!(prm.inherited.is_none()); // No inherited state since collection was removed from enablement
     }
 
     #[test]
@@ -448,17 +451,38 @@ mod tests {
         let _ = toggle::toggle_asset(&mut state, AssetKind::Collection, &collection_path)
             .expect("toggle collection on succeeds");
 
-        // Both instruction and prompt should be enabled. Because toggling restored
-        // the default (no explicit entry), inherited state is None.
+        // Both instruction and prompt should now be enabled via inheritance from the collection
         let inst = state.assets(AssetKind::Instruction).first().unwrap();
         assert!(inst.effective);
         assert!(inst.explicit.is_none());
-        assert!(inst.inherited.is_none());
+        assert_eq!(inst.inherited.as_ref().unwrap().value, true);
 
         let prm = state.assets(AssetKind::Prompt).first().unwrap();
         assert!(prm.effective);
         assert!(prm.explicit.is_none());
+        assert_eq!(prm.inherited.as_ref().unwrap().value, true);
+    }
+
+    #[test]
+    fn clean_project_assets_disabled_by_default() {
+        let catalog = multi_catalog();
+        let state = DomainState::new(catalog, EnablementFile::default());
+
+        // In a clean project, all assets should be disabled by default
+        let inst = state.assets(AssetKind::Instruction).first().unwrap();
+        assert!(!inst.effective);
+        assert!(inst.explicit.is_none());
+        assert!(inst.inherited.is_none());
+
+        let prm = state.assets(AssetKind::Prompt).first().unwrap();
+        assert!(!prm.effective);
+        assert!(prm.explicit.is_none());
         assert!(prm.inherited.is_none());
+
+        let collection = state.assets(AssetKind::Collection).first().unwrap();
+        assert!(!collection.effective);
+        assert!(collection.explicit.is_none());
+        assert!(collection.inherited.is_none());
     }
 
     #[test]
