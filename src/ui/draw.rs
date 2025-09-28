@@ -111,8 +111,18 @@ fn render_table(frame: &mut Frame<'_>, area: Rect, app: &App) {
     let rows: Vec<Row> = assets
         .iter()
         .map(|asset| {
+            let state_cell = {
+                let badge = components::state_badge(asset);
+                let style = if asset.effective {
+                    Style::default().fg(Color::Green)
+                } else {
+                    Style::default().fg(Color::Red)
+                };
+                Cell::from(badge).style(style)
+            };
+            
             Row::new(vec![
-                Cell::from(components::state_badge(asset)),
+                state_cell,
                 Cell::from(components::source_label(asset)),
                 Cell::from(asset.name.clone()),
                 Cell::from(asset.path.clone()),
@@ -126,12 +136,12 @@ fn render_table(frame: &mut Frame<'_>, area: Rect, app: &App) {
         .style(Style::default().add_modifier(Modifier::BOLD));
 
     let widths = [
-        Constraint::Length(5),
+        Constraint::Length(8),
         Constraint::Length(18),
         Constraint::Percentage(22),
         Constraint::Percentage(28),
         Constraint::Length(8),
-        Constraint::Percentage(15),
+        Constraint::Percentage(12),
     ];
     let table = Table::new(rows, widths)
         .header(header)
@@ -178,6 +188,27 @@ fn render_detail(frame: &mut Frame<'_>, area: Rect, app: &App) {
         if asset.kind == AssetKind::Collection {
             lines.push(Line::from(format!("Members: {}", asset.member_count)));
         }
+        
+        // Add Toggle Preview section
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            "Toggle Preview:",
+            Style::default().add_modifier(Modifier::BOLD).fg(Color::Yellow)
+        )));
+        for line in components::toggle_preview(asset).lines() {
+            lines.push(Line::from(line.to_string()));
+        }
+        
+        // For collections, show impact analysis
+        if asset.kind == AssetKind::Collection {
+            if let Some(impact) = components::collection_toggle_impact(asset, app.domain()) {
+                lines.push(Line::from(""));
+                for line in impact.lines() {
+                    lines.push(Line::from(line.to_string()));
+                }
+            }
+        }
+        
         lines.push(Line::from(""));
         for line in asset.description.lines() {
             lines.push(Line::from(line.to_string()));
@@ -261,5 +292,6 @@ fn prompt_text(prompt: PendingPrompt) -> &'static str {
     match prompt {
         PendingPrompt::Quit => "Confirm quit: y=Yes / n=No",
         PendingPrompt::Reload => "Confirm reload (discard changes): y=Yes / n=No",
+        PendingPrompt::ToggleCollection => "Confirm collection toggle: y=Yes / n=No",
     }
 }

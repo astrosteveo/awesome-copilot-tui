@@ -5,5 +5,5 @@ pub fn handle_input() -> Result<()> {
 }
 
 pub fn key_hints() -> &'static str {
-    "Tab/Shift+Tab switch tabs • Up/Down move • Enter/Space toggle • / search • Ctrl+S save • c cleanup • r reload • q quit"
+    "Tab/Shift+Tab switch tabs • Up/Down move • Enter/Space toggle (collections ask for confirmation) • / search • Ctrl+S save • c cleanup • r reload • q quit"
 }
