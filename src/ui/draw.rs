@@ -123,7 +123,6 @@ fn render_table(frame: &mut Frame<'_>, area: Rect, app: &App) {
             
             Row::new(vec![
                 state_cell,
-                Cell::from(components::source_label(asset)),
                 Cell::from(asset.name.clone()),
                 Cell::from(asset.path.clone()),
                 Cell::from(components::local_status(asset)),
@@ -132,16 +131,15 @@ fn render_table(frame: &mut Frame<'_>, area: Rect, app: &App) {
         })
         .collect();
 
-    let header = Row::new(vec!["State", "Source", "Name", "Path", "Local", "Tags"])
+    let header = Row::new(vec!["State", "Name", "Path", "Local", "Tags"])
         .style(Style::default().add_modifier(Modifier::BOLD));
 
     let widths = [
         Constraint::Length(8),
-        Constraint::Length(18),
-        Constraint::Percentage(22),
-        Constraint::Percentage(28),
+        Constraint::Percentage(30),
+        Constraint::Percentage(40),
         Constraint::Length(8),
-        Constraint::Percentage(12),
+        Constraint::Percentage(22),
     ];
     let table = Table::new(rows, widths)
         .header(header)
